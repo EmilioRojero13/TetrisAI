@@ -56,7 +56,7 @@ clock = pygame.time.Clock()
 
 # Grids
 player_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-
+ai_grid =  [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 # Draw the game board
 def draw_board(x, y):
     pygame.draw.rect(screen, WHITE, (x, y, BOARD_WIDTH, BOARD_HEIGHT), BORDER_THICKNESS)
@@ -110,6 +110,10 @@ def new_piece():
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
 current_x, current_y = GRID_WIDTH // 2, 0
+ai_x, ai_y = current_x, current_y
+ai_piece = current_piece
+ai_type = current_type
+ai_color = piece_color
 
 lock_timer = None
 running = True
@@ -160,7 +164,28 @@ while running:
             current_y += 1
             moved = True
 
-    # Apply gravity
+    # Apply gravity to the ai board
+    # Apply gravity to AI
+    if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
+        ai_y += 1
+    else:
+        # Lock AI piece into place
+        for dx, dy in ai_piece:
+            ai_grid[ai_y + dy][ai_x + dx] = ai_color
+
+        # Clear full lines
+        ai_grid, _ = clear_lines(ai_grid)
+
+        # Spawn a new AI piece at the top
+        ai_piece, ai_type, ai_color = new_piece()
+        ai_x, ai_y = GRID_WIDTH // 2, 0
+
+        # Check if the new piece is immediately blocked (AI loses)
+        if not valid_move(ai_piece, (ai_x, ai_y), ai_grid):
+            print("AI lost!")
+            running = False
+            
+    # apply gravity to user
     if pygame.time.get_ticks() - last_movement_time > 1000 // FPS:
         if valid_move(current_piece, (current_x, current_y + 1), player_grid):
             current_y += 1
@@ -178,6 +203,8 @@ while running:
                 current_x, current_y = GRID_WIDTH // 2, 0
                 lock_timer = None
         last_movement_time = pygame.time.get_ticks()
+        if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
+            ai_y += 1
 
     # Draw player board
     draw_board(PLAYER_X, BOARD_Y)
@@ -188,9 +215,12 @@ while running:
         for col in range(GRID_WIDTH):
             if player_grid[row][col] is not None:
                 draw_piece(PLAYER_X + col * CELL_SIZE, BOARD_Y + row * CELL_SIZE, [(0, 0)], player_grid[row][col])
+            if ai_grid[row][col] is not None:
+                draw_piece(AI_X + col * CELL_SIZE, BOARD_Y + row * CELL_SIZE, [(0, 0)], ai_grid[row][col])
 
     # Draw current piece
     draw_piece(PLAYER_X + current_x * CELL_SIZE, BOARD_Y + current_y * CELL_SIZE, current_piece, piece_color)
+    draw_piece(AI_X + ai_x * CELL_SIZE, BOARD_Y + ai_y * CELL_SIZE, current_piece, piece_color)
 
     pygame.display.flip()
     clock.tick(FPS)
