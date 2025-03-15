@@ -6,7 +6,7 @@ import time
 pygame.init()
 
 # Constants
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 900, 600
 FPS = 10
 LOCK_DELAY = 1
 
@@ -181,6 +181,7 @@ while running:
 
     # Draw player board
     draw_board(PLAYER_X, BOARD_Y)
+    draw_board(AI_X, BOARD_Y)
 
     # Draw player grid
     for row in range(GRID_HEIGHT):
