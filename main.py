@@ -125,7 +125,7 @@ user_piece_queue = deque([])
 for i in range(5):
     user_piece_queue.append(new_piece())
 
-ai_piece_queue = user_piece_queue.copy()
+ai_piece_queue = deque(user_piece_queue)
 
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
