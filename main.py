@@ -110,7 +110,7 @@ def new_piece():
     piece_type = random.choice(list(PIECES.keys()))
     return PIECES[piece_type], piece_type, COLORS[piece_type]
 
-#shared queue
+# Shared queue
 def get_next_piece(player, ai_piece_queue, user_piece_queue):
     new_addition = new_piece()
     ai_piece_queue.append(new_addition)
@@ -120,12 +120,13 @@ def get_next_piece(player, ai_piece_queue, user_piece_queue):
     if player == "user":
         return user_piece_queue.popleft()
 
-#shared piece queue
+# Shared piece queue
 user_piece_queue = deque([])
 for i in range(5):
     user_piece_queue.append(new_piece())
 
 ai_piece_queue = deque(user_piece_queue)
+
 
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
@@ -140,6 +141,10 @@ running = True
 game_over = False
 last_movement_time = 0
 rotation_pressed = False  
+
+# AI Falling Speed (in milliseconds)
+AI_FALL_SPEED = 200
+last_ai_fall_time = pygame.time.get_ticks()
 
 # Main Game Loop
 while running:
@@ -184,27 +189,30 @@ while running:
             current_y += 1
             moved = True
 
-    # Apply gravity to AI
-    if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
-        ai_y += 1
-    else:
-        # Lock AI piece into place
-        for dx, dy in ai_piece:
-            ai_grid[ai_y + dy][ai_x + dx] = ai_color
+    # Apply gravity to AI with slower speed
+    if pygame.time.get_ticks() - last_ai_fall_time > AI_FALL_SPEED:
+        if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
+            ai_y += 1
+        else:
+            # Lock AI piece into place
+            for dx, dy in ai_piece:
+                ai_grid[ai_y + dy][ai_x + dx] = ai_color
 
-        # Clear full lines
-        ai_grid, _ = clear_lines(ai_grid)
+            # Clear full lines
+            ai_grid, _ = clear_lines(ai_grid)
 
-        # Spawn a new AI piece at the top
-        ai_piece, ai_type, ai_color = get_next_piece("ai", ai_piece_queue, user_piece_queue)
-        ai_x, ai_y = GRID_WIDTH // 2, 0
+            # Spawn a new AI piece at the top
+            ai_piece, ai_type, ai_color = get_next_piece("ai", ai_piece_queue, user_piece_queue)
 
-        # Check if the new piece is immediately blocked (AI loses)
-        if not valid_move(ai_piece, (ai_x, ai_y), ai_grid):
-            print("AI lost!")
-            running = False
-            
-    # apply gravity to user
+            ai_x, ai_y = GRID_WIDTH // 2, 0
+
+            # Check if the new piece is immediately blocked (AI loses)
+            if not valid_move(ai_piece, (ai_x, ai_y), ai_grid):
+                print("AI lost!")
+                running = False
+        last_ai_fall_time = pygame.time.get_ticks()
+
+    # Apply gravity to user
     if pygame.time.get_ticks() - last_movement_time > 1000 // FPS:
         if valid_move(current_piece, (current_x, current_y + 1), player_grid):
             current_y += 1
@@ -222,8 +230,6 @@ while running:
                 current_x, current_y = GRID_WIDTH // 2, 0
                 lock_timer = None
         last_movement_time = pygame.time.get_ticks()
-        if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
-            ai_y += 1
 
     # Draw player board
     draw_board(PLAYER_X, BOARD_Y)
