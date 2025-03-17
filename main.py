@@ -1,7 +1,10 @@
 import pygame
-import random
 import time
 from collections import deque
+from user import new_piece, get_next_piece, valid_move, rotate_piece, clear_lines ,user_piece_queue
+from ai import ai_move, AI_FALL_SPEED, last_ai_fall_time
+from pieces import PIECES, COLORS
+
 
 # Initialize Pygame
 pygame.init()
@@ -10,7 +13,6 @@ pygame.init()
 WIDTH, HEIGHT = 900, 600
 FPS = 10
 LOCK_DELAY = 1
-
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 CELL_SIZE = 30
 BORDER_THICKNESS = 3
@@ -19,26 +21,6 @@ BORDER_THICKNESS = 3
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (100, 100, 100)
-COLORS = {
-    "O": (255, 255, 0),
-    "I": (0, 255, 255),
-    "S": (0, 255, 0),
-    "Z": (255, 0, 0),
-    "L": (255, 165, 0),
-    "J": (0, 0, 255),
-    "T": (128, 0, 128),
-}
-
-# Tetris Pieces
-PIECES = {
-    "O": [(0, 0), (1, 0), (0, 1), (1, 1)],
-    "I": [(-1, 0), (0, 0), (1, 0), (2, 0)],
-    "S": [(-1, 0), (0, 0), (0, 1), (1, 1)],
-    "Z": [(1, 0), (0, 0), (0, 1), (-1, 1)],
-    "L": [(-1, 0), (0, 0), (1, 0), (1, 1)],
-    "J": [(-1, 0), (0, 0), (1, 0), (-1, 1)],
-    "T": [(-1, 0), (0, 0), (1, 0), (0, 1)],
-}
 
 # Board positioning
 BOARD_WIDTH = GRID_WIDTH * CELL_SIZE
@@ -52,13 +34,11 @@ BOARD_Y = (HEIGHT // 2) - (BOARD_HEIGHT // 2)
 # Game Window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Tetris AI vs Human")
-
 clock = pygame.time.Clock()
 
 # Grids
 player_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 ai_grid =  [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-
 
 # Draw the game board
 def draw_board(x, y):
@@ -75,59 +55,6 @@ def draw_piece(x, y, shape, color):
         pygame.draw.rect(screen, color, rect)
         pygame.draw.rect(screen, BLACK, rect, 2)
 
-# Check if a move is valid
-def valid_move(shape, offset, grid):
-    off_x, off_y = offset
-    for dx, dy in shape:
-        x = off_x + dx
-        y = off_y + dy
-        if x < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
-            return False  
-        if y >= 0 and grid[y][x] is not None:
-            return False  
-    return True
-
-# Rotate a piece
-def rotate_piece(shape):
-    return [(dy, -dx) for dx, dy in shape]
-
-# Clear completed lines
-def clear_lines(grid):
-    new_grid = [row for row in grid if any(cell is None for cell in row)]
-    lines_cleared = GRID_HEIGHT - len(new_grid)
-    new_grid = [[None] * GRID_WIDTH for _ in range(lines_cleared)] + new_grid
-    return new_grid, lines_cleared
-
-# Display game message
-def display_message(text, color):
-    font = pygame.font.Font(None, 74)
-    message = font.render(text, True, color)
-    message_rect = message.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-    screen.blit(message, message_rect)
-
-# Generate a new piece
-def new_piece():
-    piece_type = random.choice(list(PIECES.keys()))
-    return PIECES[piece_type], piece_type, COLORS[piece_type]
-
-# Shared queue
-def get_next_piece(player, ai_piece_queue, user_piece_queue):
-    new_addition = new_piece()
-    ai_piece_queue.append(new_addition)
-    user_piece_queue.append(new_addition)
-    if player == "ai":
-        return ai_piece_queue.popleft()
-    if player == "user":
-        return user_piece_queue.popleft()
-
-# Shared piece queue
-user_piece_queue = deque([])
-for i in range(5):
-    user_piece_queue.append(new_piece())
-
-ai_piece_queue = deque(user_piece_queue)
-
-
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
 current_x, current_y = GRID_WIDTH // 2, 0
@@ -135,16 +62,13 @@ ai_x, ai_y = current_x, current_y
 ai_piece = current_piece
 ai_type = current_type
 ai_color = piece_color
-
 lock_timer = None
 running = True
 game_over = False
 last_movement_time = 0
-rotation_pressed = False  
+rotation_pressed = False 
 
-# AI Falling Speed (in milliseconds)
-AI_FALL_SPEED = 200
-last_ai_fall_time = pygame.time.get_ticks()
+ai_piece_queue = deque(user_piece_queue)
 
 # Main Game Loop
 while running:
