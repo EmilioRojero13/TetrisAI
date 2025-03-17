@@ -55,6 +55,14 @@ def draw_piece(x, y, shape, color):
         pygame.draw.rect(screen, color, rect)
         pygame.draw.rect(screen, BLACK, rect, 2)
 
+# Display game message
+def display_message(text, color):
+    font = pygame.font.Font(None, 74)
+    message = font.render(text, True, color)
+    message_rect = message.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+    screen.blit(message, message_rect)
+
+
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
 current_x, current_y = GRID_WIDTH // 2, 0
