@@ -1,6 +1,7 @@
 import pygame
 import random
 import time
+from collections import deque
 
 # Initialize Pygame
 pygame.init()
@@ -57,6 +58,8 @@ clock = pygame.time.Clock()
 # Grids
 player_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 ai_grid =  [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+
+
 # Draw the game board
 def draw_board(x, y):
     pygame.draw.rect(screen, WHITE, (x, y, BOARD_WIDTH, BOARD_HEIGHT), BORDER_THICKNESS)
@@ -106,6 +109,23 @@ def display_message(text, color):
 def new_piece():
     piece_type = random.choice(list(PIECES.keys()))
     return PIECES[piece_type], piece_type, COLORS[piece_type]
+
+#shared queue
+def get_next_piece(player, ai_piece_queue, user_piece_queue):
+    new_addition = new_piece()
+    ai_piece_queue.append(new_addition)
+    user_piece_queue.append(new_addition)
+    if player == "ai":
+        return ai_piece_queue.popleft()
+    if player == "user":
+        return user_piece_queue.popleft()
+
+#shared piece queue
+user_piece_queue = deque([])
+for i in range(5):
+    user_piece_queue.append(new_piece())
+
+ai_piece_queue = user_piece_queue.copy()
 
 # Game state variables
 current_piece, current_type, piece_color = new_piece()
@@ -164,7 +184,6 @@ while running:
             current_y += 1
             moved = True
 
-    # Apply gravity to the ai board
     # Apply gravity to AI
     if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
         ai_y += 1
@@ -177,7 +196,7 @@ while running:
         ai_grid, _ = clear_lines(ai_grid)
 
         # Spawn a new AI piece at the top
-        ai_piece, ai_type, ai_color = new_piece()
+        ai_piece, ai_type, ai_color = get_next_piece("ai", ai_piece_queue, user_piece_queue)
         ai_x, ai_y = GRID_WIDTH // 2, 0
 
         # Check if the new piece is immediately blocked (AI loses)
@@ -199,7 +218,7 @@ while running:
                 if current_y < 1:
                     game_over = True
                 player_grid, _ = clear_lines(player_grid)
-                current_piece, current_type, piece_color = new_piece()
+                current_piece, current_type, piece_color = get_next_piece("user", ai_piece_queue, user_piece_queue)
                 current_x, current_y = GRID_WIDTH // 2, 0
                 lock_timer = None
         last_movement_time = pygame.time.get_ticks()
@@ -220,7 +239,7 @@ while running:
 
     # Draw current piece
     draw_piece(PLAYER_X + current_x * CELL_SIZE, BOARD_Y + current_y * CELL_SIZE, current_piece, piece_color)
-    draw_piece(AI_X + ai_x * CELL_SIZE, BOARD_Y + ai_y * CELL_SIZE, current_piece, piece_color)
+    draw_piece(AI_X + ai_x * CELL_SIZE, BOARD_Y + ai_y * CELL_SIZE, ai_piece, ai_color)
 
     pygame.display.flip()
     clock.tick(FPS)
