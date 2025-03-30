@@ -121,28 +121,33 @@ while running:
             current_y += 1
             moved = True
 
-    # Apply gravity to AI with slower speed
+    # AI decision-making with line-clearing priority
     if pygame.time.get_ticks() - last_ai_fall_time > AI_FALL_SPEED:
-        if valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):  
-            ai_y += 1
-        else:
-            # Lock AI piece into place
-            for dx, dy in ai_piece:
-                ai_grid[ai_y + dy][ai_x + dx] = ai_color
+        ai_x, ai_y, ai_piece = ai_move(
+            ai_x, ai_y, ai_piece, ai_color, ai_grid, ai_piece_queue, user_piece_queue
+        )
 
-            # Clear full lines
+        # Lock the AI piece if it can't move further
+        if not valid_move(ai_piece, (ai_x, ai_y + 1), ai_grid):
+            # Place the piece in the grid
+            for px, py in ai_piece:
+                if 0 <= ai_y + py < len(ai_grid) and 0 <= ai_x + px < len(ai_grid[0]):
+                    ai_grid[ai_y + py][ai_x + px] = ai_color
+
+            # Clear full lines after locking
             ai_grid, _ = clear_lines(ai_grid)
 
-            # Spawn a new AI piece at the top
-            ai_piece, ai_type, ai_color = get_next_piece("ai", ai_piece_queue, user_piece_queue)
+            # Get a new AI piece
+            ai_piece, _, ai_color = get_next_piece("ai", ai_piece_queue, user_piece_queue)
+            ai_x, ai_y = len(ai_grid[0]) // 2, 0
 
-            ai_x, ai_y = GRID_WIDTH // 2, 0
-
-            # Check if the new piece is immediately blocked (AI loses)
+            # Check for AI loss
             if not valid_move(ai_piece, (ai_x, ai_y), ai_grid):
                 print("AI lost!")
                 running = False
+
         last_ai_fall_time = pygame.time.get_ticks()
+
 
     # Apply gravity to user
     if pygame.time.get_ticks() - last_movement_time > 1000 // FPS:

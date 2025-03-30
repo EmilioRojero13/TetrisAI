@@ -1,11 +1,11 @@
 import random
 import pygame
 from collections import deque
-from user import valid_move, rotate_piece, get_next_piece
+from user import valid_move, rotate_piece, get_next_piece, clear_lines
 from pieces import PIECES, COLORS
 
 # AI Falling Speed (in milliseconds)
-AI_FALL_SPEED = 200
+AI_FALL_SPEED = 1000
 last_ai_fall_time = pygame.time.get_ticks()
 
 # Heuristic Evaluation Function
@@ -13,54 +13,75 @@ def evaluate_board(grid):
     holes = 0
     height = 0
     full_lines = 0
-    for x in range(10):
-        column_height = 0
+    bumpiness = 0
+    column_heights = [0] * len(grid[0])
+
+    # Count holes, height, and full lines
+    for x in range(len(grid[0])):  # Iterate over columns
         hole_in_column = False
-        for y in range(20):
+        for y in range(len(grid)):  # Iterate over rows
             if grid[y][x] is not None:
-                column_height = max(column_height, y)
+                if column_heights[x] == 0:
+                    column_heights[x] = len(grid) - y  # Height of the column
                 if hole_in_column:
-                    holes += 1
+                    holes += 1  # Count holes beneath filled cells
             else:
                 hole_in_column = True
-        height += column_height
-    return -height - 5 * holes + 100 * full_lines
 
-# AI Decision Making (choose the best move based on the heuristic)
+    # Calculate bumpiness (difference in column heights)
+    for i in range(len(column_heights) - 1):
+        bumpiness += abs(column_heights[i] - column_heights[i + 1])
+
+    # Count full lines
+    for row in grid:
+        if all(cell is not None for cell in row):
+            full_lines += 1
+
+    # Weighted score prioritizing line clears heavily
+    return (
+        -0.5 * height     # Slightly penalize height
+        - 1.5 * holes      # Heavily penalize holes
+        - 0.5 * bumpiness  # Penalize bumpy boards
+        + 1000 * full_lines  # Strongly reward clearing lines
+    )
+
+
+# Global counter to track the number of AI pieces placed
+
+
 def ai_move(ai_x, ai_y, ai_piece, ai_color, ai_grid, ai_piece_queue, user_piece_queue):
-    best_score = float('-inf')
+    # Simulate possible moves and rotations
     best_move = None
+    best_evaluation = float('-inf')  # We want to maximize the score
 
     for rotation in range(4):  # Try all 4 rotations
-        rotated_piece = ai_piece
-        for _ in range(rotation):
-            rotated_piece = rotate_piece(rotated_piece)
+        rotated_piece = rotate_piece(ai_piece)
+        
+        for x_offset in range(-5, 6):  # Try horizontal movement within a range
+            temp_x = ai_x + x_offset
+            temp_y = ai_y
 
-        for dx in range(-10, 10):  # Try all x offsets
-            if valid_move(rotated_piece, (ai_x + dx, ai_y), ai_grid):
-                # Drop the piece as far as it can go
-                y_offset = ai_y
-                while valid_move(rotated_piece, (ai_x + dx, y_offset + 1), ai_grid):
-                    y_offset += 1
+            # Check if the rotated piece can fit at the new position
+            if valid_move(rotated_piece, (temp_x, temp_y), ai_grid):
+                # Let the piece fall to the bottom of the board
+                while valid_move(rotated_piece, (temp_x, temp_y + 1), ai_grid):
+                    temp_y += 1
 
-                # Simulate the move
-                temp_grid = [row[:] for row in ai_grid]
-                for dx, dy in rotated_piece:
-                    temp_grid[y_offset + dy][ai_x + dx] = ai_color
+                # Evaluate the position
+                temp_grid = [row[:] for row in ai_grid]  # Make a copy of the AI grid
+                for px, py in rotated_piece:
+                    if 0 <= temp_y + py < len(temp_grid) and 0 <= temp_x + px < len(temp_grid[0]):
+                        temp_grid[temp_y + py][temp_x + px] = ai_color
 
-                # Evaluate the board state
-                score = evaluate_board(temp_grid)
+                # Use the heuristic to evaluate the board state after this move
+                evaluation = evaluate_board(temp_grid)
 
-                if score > best_score:
-                    best_score = score
-                    best_move = (rotation, dx, y_offset)
+                # If the evaluation is better than the current best, update
+                if evaluation > best_evaluation:
+                    best_evaluation = evaluation
+                    best_move = (temp_x, temp_y, rotated_piece)
 
     if best_move:
-        rotation, dx, y_offset = best_move
-        for _ in range(rotation):
-            ai_piece = rotate_piece(ai_piece)
-
-        ai_x += dx
-        ai_y = y_offset
-
+        ai_x, ai_y, ai_piece = best_move
     return ai_x, ai_y, ai_piece
+
