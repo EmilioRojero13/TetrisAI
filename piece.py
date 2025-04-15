@@ -1,5 +1,3 @@
-# Tetris Pieces and Colors
-# Tetris Pieces Shapes
 PIECES = {
     "O": [(0, 0), (1, 0), (0, 1), (1, 1)],
     "I": [(-1, 0), (0, 0), (1, 0), (2, 0)],
@@ -20,3 +18,11 @@ COLORS = {
     "J": (0, 0, 255),
     "T": (128, 0, 128),
 }
+
+class Piece:
+    def __init__(self, shape, color):
+        self.shape = shape
+        self.color = color
+
+    def rotate(self):
+        self.shape = [(-dy, dx) for dx, dy in self.shape]  # rotación 90° antihorario
