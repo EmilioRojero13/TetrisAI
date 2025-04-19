@@ -26,7 +26,7 @@ clock = pygame.time.Clock()
 user_board = Board(GRID_WIDTH, GRID_HEIGHT)
 ai_board = Board(GRID_WIDTH, GRID_HEIGHT)
 fall_time = 0
-fall_speed = 750  # milisegundos
+fall_speed = 2000  # milisegundos
 ai_player = AI()
 
 def main():
@@ -40,9 +40,12 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:  # Detecta solo cuando se presiona la tecla
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:  
                     user_board.rotate()
+                if event.key == pygame.K_SPACE:
+                    user_board.hard_drop_to_column()
+
 
         keys = pygame.key.get_pressed()  
 
@@ -54,11 +57,17 @@ def main():
             user_board.soft_drop()
         
         if fall_time > fall_speed:
-            user_board.move_down()
-            print(ai_player.eval_function(ai_board.grid))
-            ai_board.move_down()
-            ai_board.move_down()
+
+            # user_board.move_down() DESCOMENTAR
+
+            ai_move = ai_player.get_next_move(ai_board)
+            print(ai_move)
+
+            ai_board.hard_drop_to_column(ai_move[0], ai_move[1])
+
             fall_time = 0
+   
+
 
         user_board.draw(screen, USER_BOARD_X, USER_BOARD_Y, CELL_SIZE)
         ai_board.draw(screen, AI_BOARD_X, AI_BOARD_Y, CELL_SIZE)

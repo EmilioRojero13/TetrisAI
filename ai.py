@@ -1,5 +1,7 @@
 from board import Board
-from piece import PIECES, COLORS, Piece
+from piece import Piece, PIECES, COLORS, ROTATION_LIMITS
+import sys
+import pygame
 
 class AI:
     def __init__(self):
@@ -9,100 +11,154 @@ class AI:
             "holes": -0.24921408023878,
             "bumpiness": -0.164626498034284
         }
+        self.planned_moves = []
 
     def clone_board(self, board):
         new_board = Board(board.width, board.height)
-        new_board.grid = [row.copy() for row in board.grid] 
+        new_board.grid = [row.copy() for row in board.grid]
         new_board.queue = board.queue.copy()
-        new_board.current_piece = board.current_piece  
-        new_board.current_position = board.current_position  
+        new_board.current_piece = board.current_piece
+        new_board.current_position = board.current_position
         return new_board
-    
+
     def apply_move(self, board, piece_key, move):
         piece_shape = PIECES[piece_key]
         piece_color = COLORS[piece_key]
-        piece = Piece(piece_shape, piece_color)
+        piece = Piece(piece_shape.copy(), piece_color)
 
         x, rotation = move
-        rotated_piece = Piece(piece_shape.copy(), piece_color)
-        rotated_piece.rotate(rotation)
+        for _ in range(rotation):
+            piece.rotate()
 
-        pos = (x, 0)
-        while board.is_valid_position(rotated_piece, pos):
-            pos = (pos[0], pos[1] + 1) 
+        pos = (x, 3)
+        while board.is_valid_position(piece, pos):
+            pos = (pos[0], pos[1] + 1)
         pos = (pos[0], pos[1] - 1)
 
-        for dx, dy in rotated_piece.shape:
+        for dx, dy in piece.shape:
             bx, by = pos[0] + dx, pos[1] + dy
             if 0 <= bx < board.width and 0 <= by < board.height:
                 board.grid[by][bx] = piece_color
 
+        board.clear_lines()  # Importante para evaluar correctamente el siguiente estado
+
     def choose_best_move(self, board, piece_key):
         best_score = float('-inf')
         best_move = None
+        sim_board = None
 
-        piece_shape = PIECES[piece_key]
-        piece_color = COLORS[piece_key]
-        piece = Piece(piece_shape, piece_color)
+        for rotation in range(ROTATION_LIMITS[piece_key]):
+            # Construir pieza rotada
+            piece_shape = PIECES[piece_key]
+            piece_color = COLORS[piece_key]
+            test_piece = Piece(piece_shape.copy(), piece_color)
+            for _ in range(rotation):
+                test_piece.rotate()
 
-        for rotation in range(4): 
-            for x in range(board.width): 
-                sim_board = self.clone_board(board)  
+            # Calcular el ancho máximo (x más alto en la forma)
+            piece_width = max(x for x, y in test_piece.shape) + 1
+            valid_x_range = board.width - piece_width + 1
 
-                self.apply_move(sim_board, piece_key, (x, rotation))
+            for x in range(valid_x_range):
+                sim_board = self.clone_board(board)
+                try:
+                    # print(f"Trying piece {piece_key} at x={x}, rotation={rotation}")
 
-                score = self.evaluate_board(sim_board.grid)
+                    # Crear una copia de la pieza rotada
+                    piece = Piece(piece_shape.copy(), piece_color)
+                    for _ in range(rotation):
+                        piece.rotate()
 
-                if score > best_score:
-                    best_score = score
-                    best_move = (x, rotation)
+                    # Calcular posición final bajando la pieza
+                    pos = (x, 3)
+                    while sim_board.is_valid_position(piece, pos):
+                        pos = (pos[0], pos[1] + 1)
+                    pos = (pos[0], pos[1] - 1)
 
+                    # Validar posición final
+                    if not sim_board.is_valid_position(piece, pos):
+                        # print(f"Invalid final position at x={x}, rotation={rotation}, skipping...")
+                        continue
+
+                    # Aplicar movimiento y evaluar
+                    self.apply_move(sim_board, piece_key, (x, rotation))
+                    # print("Board after move:")
+                    # for i in sim_board.grid:
+                    #     print(i)
+
+                    score = self.eval_function(sim_board.grid)
+                    # print(f"Score: {score}")
+                    if score > best_score:
+                        best_score = score
+                        best_move = (x, rotation)
+                except Exception as e:
+                    # print(f"Exception at x={x}, rotation={rotation}: {e}")
+                    continue
         return best_move
-    
-    def plan_moves(self, board: Board, queue: list[str]):
-        self.planned_moves = []
+
+    def initial_deep_rollout(self, board, queue):
+        self.planned_moves.clear()
         sim_board = self.clone_board(board)
-
-        for i in range(len(queue)): 
-            piece_key = queue[i]
+        count = 0
+        print(queue)
+        for piece_key in queue:
+            count += 1
             best_move = self.choose_best_move(sim_board, piece_key)
+            if best_move is None:
+                break  # No hay movimientos válidos, detener el rollout
             self.planned_moves.append(best_move)
-
             self.apply_move(sim_board, piece_key, best_move)
+            print("final would be")
+            print(best_move)
+            print(piece_key)
+            for i in sim_board.grid:
+                print(i)
 
-    def get_next_move(self, board, next_piece_key):
-        if self.planned_moves:
-            return self.planned_moves.pop(0)  # Retorna el siguiente movimiento planeado
+
+        
+        # sys.exit(1)
+
+    def incremental_plan(self, board, new_piece_key):
+        sim_board = self.clone_board(board)
+       
+        # Aplicamos los movimientos ya planeados al board clonado
+        for i, move in enumerate(self.planned_moves):
+            if i < len(board.queue):  # Solo acceder a índices válidos
+                piece_key = board.queue[i]
+                self.apply_move(sim_board, piece_key, move)
+
+        # Planificamos solo el nuevo movimiento para la pieza recién añadida
+        best_move = self.choose_best_move(sim_board, new_piece_key)
+        self.planned_moves.append(best_move)
+
+    def get_next_move(self, board):
+        # Si no hay movimientos planeados, realiza el rollout inicial con los primeros 5 movimientos
+
+        if not self.planned_moves:
+            initial_list = [board.current_piece_label] + board.queue[:4]
+            self.initial_deep_rollout(board, initial_list)  # Planea con las primeras 5 piezas
         else:
-            # Si no hay movimientos planeados, planifica de nuevo
-            self.plan_moves(board, board.queue)
-            return self.planned_moves.pop(0)
+            # # Descartamos el primer movimiento ya realizado y planeamos el siguiente movimiento
+            self.planned_moves.pop(0)
+            self.incremental_plan(board, board.queue[4])  # Solo planifica el nuevo movimiento para la nueva pieza
 
-    
+        return self.planned_moves[0]  # Devuelve el siguiente movimiento planeado
+
     def compute_aggregate_height(self, board):
         width = 10
         height = 20
         total_height = 0
-
         for x in range(width):
-            column_height = 0
             for y in range(height):
                 if board[y][x] is not None:
-                    column_height = height - y
+                    total_height += height - y
                     break
-            total_height += column_height
-
         return total_height
-    
+
     def count_complete_lines(self, board):
         count = 0
         for row in board:
-            is_complete = True
-            for cell in row:
-                if cell is None:
-                    is_complete = False
-                    break
-            if is_complete:
+            if all(cell is not None for cell in row):
                 count += 1
         return count
 
@@ -110,36 +166,28 @@ class AI:
         width = 10
         height = 20
         holes = 0
-
         for x in range(width):
             block_found = False
             for y in range(height):
                 if board[y][x] is not None:
                     block_found = True
-                elif board[y][x] is None and block_found:
+                elif block_found:
                     holes += 1
-
         return holes
-    
-    def compute_bumpiness(self, board):
-        width = 10
-        height = 20
-        heights = []
 
+    def compute_bumpiness(self, board):
+        height = 20
+        width = 10
+        heights = []
         for x in range(width):
-            column_height = 0
+            h = 0
             for y in range(height):
                 if board[y][x] is not None:
-                    column_height = height - y
+                    h = height - y
                     break
-            heights.append(column_height)
+            heights.append(h)
+        return sum(abs(heights[i] - heights[i + 1]) for i in range(width - 1))
 
-        bumpiness = 0
-        for i in range(width - 1):
-            bumpiness += abs(heights[i] - heights[i + 1])
-
-        return bumpiness
-    
     def eval_function(self, board):
         agg_height = self.compute_aggregate_height(board)
         lines = self.count_complete_lines(board)

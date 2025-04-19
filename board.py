@@ -13,6 +13,7 @@ class Board:
         self.grid = [[None for _ in range(width)] for _ in range(height)]
         self.current_piece = None
         self.current_position = (0, 0)
+        self.current_piece_label = None
         self.queue = self.init_queue()
         self.spawn_new_piece()
 
@@ -33,13 +34,13 @@ class Board:
         return True
 
     def spawn_new_piece(self):
-        print(self.queue)
+        piece_type = self.queue.pop(0)
         last_in_queue = random.choice(list(PIECES.keys()))
         self.queue.append(last_in_queue)
-        piece_type = self.queue.pop(0)
         shape = PIECES[piece_type]
         color = COLORS[piece_type]
         self.current_piece = Piece(shape, color)
+        self.current_piece_label = piece_type
         self.current_position = (self.width // 2, 0)
 
     def clear_lines(self):
@@ -113,8 +114,28 @@ class Board:
             self.clear_lines()
             self.spawn_new_piece()
 
-    def rotate(self):
+    def rotate(self, rotation=1, force=False):
         rotated_piece = Piece(self.current_piece.shape.copy(), self.current_piece.color)
-        rotated_piece.rotate()
-        if self.is_valid_position(rotated_piece, self.current_position):
+        for _ in range(rotation):
+            rotated_piece.rotate()
+        
+        if force or self.is_valid_position(rotated_piece, self.current_position):
             self.current_piece = rotated_piece
+
+
+    def hard_drop_to_column(self,x=None, rotation=0):
+        self.rotate(rotation, force=True)  # Rota la pieza si es necesario
+        if not x:
+            pos = (self.current_position[0], self.current_position[1])  # Empieza desde la parte superior de la columna deseada
+        else:
+            pos = (x, 0)
+
+        # Baja la pieza hasta el fondo de la columna
+        while self.is_valid_position(self.current_piece, (pos[0], pos[1] + 1)):
+            pos = (pos[0], pos[1] + 1)
+
+        # Coloca la pieza en la fila más baja posible en esa columna
+        self.current_position = pos
+        self.lock_piece()
+        self.clear_lines()
+        self.spawn_new_piece()
