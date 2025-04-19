@@ -1,6 +1,7 @@
 import pygame
 import sys
 from board import Board
+from ai import AI
 
 # Inicializar Pygame
 pygame.init()
@@ -26,6 +27,7 @@ user_board = Board(GRID_WIDTH, GRID_HEIGHT)
 ai_board = Board(GRID_WIDTH, GRID_HEIGHT)
 fall_time = 0
 fall_speed = 750  # milisegundos
+ai_player = AI()
 
 def main():
     global fall_time
@@ -53,6 +55,8 @@ def main():
         
         if fall_time > fall_speed:
             user_board.move_down()
+            print(ai_player.eval_function(ai_board.grid))
+            ai_board.move_down()
             ai_board.move_down()
             fall_time = 0
 

@@ -24,5 +24,6 @@ class Piece:
         self.shape = shape
         self.color = color
 
-    def rotate(self):
-        self.shape = [(-dy, dx) for dx, dy in self.shape]  # rotación 90° antihorario
+    def rotate(self, times=1):
+        for _ in range(times):
+            self.shape = [(-dy, dx) for dx, dy in self.shape]
