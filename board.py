@@ -124,11 +124,13 @@ class Board:
 
 
     def hard_drop_to_column(self,x=None, rotation=0):
-        self.rotate(rotation, force=True)  # Rota la pieza si es necesario
-        if not x:
+        if rotation:
+            self.rotate(rotation, force=True)
+
+        if x is None:
             pos = (self.current_position[0], self.current_position[1])  # Empieza desde la parte superior de la columna deseada
         else:
-            pos = (x, 0)
+            pos = (x, 3)
 
         # Baja la pieza hasta el fondo de la columna
         while self.is_valid_position(self.current_piece, (pos[0], pos[1] + 1)):

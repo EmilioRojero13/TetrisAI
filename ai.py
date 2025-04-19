@@ -6,10 +6,14 @@ import pygame
 class AI:
     def __init__(self):
         self.weights = {
-            "aggregate_height": -0.798752914564018,
-            "complete_lines": 0.522287506868767,
-            "holes": -0.24921408023878,
-            "bumpiness": -0.164626498034284
+            # "aggregate_height": -0.798752914564018,
+            # "complete_lines": 0.522287506868767,
+            # "holes": -0.24921408023878,
+            # "bumpiness": -0.164626498034284
+            "aggregate_height": -0.9,
+            "complete_lines": 0.72,
+            "holes": -0.45,
+            "bumpiness": -0.12
         }
         self.planned_moves = []
 
@@ -96,53 +100,51 @@ class AI:
                     continue
         return best_move
 
-    def initial_deep_rollout(self, board, queue):
+    def initial_deep_rollout(self, board, queue, initial_move, initial_piece_label):
         self.planned_moves.clear()
         sim_board = self.clone_board(board)
-        count = 0
-        print(queue)
+        self.apply_move(sim_board, initial_piece_label, initial_move)
+
+
         for piece_key in queue:
-            count += 1
             best_move = self.choose_best_move(sim_board, piece_key)
             if best_move is None:
-                break  # No hay movimientos válidos, detener el rollout
+                break  
             self.planned_moves.append(best_move)
             self.apply_move(sim_board, piece_key, best_move)
-            print("final would be")
-            print(best_move)
-            print(piece_key)
-            for i in sim_board.grid:
-                print(i)
 
-
-        
-        # sys.exit(1)
+            # print("final would be")
+            # print(best_move)
+            # print(piece_key)
+            # for i in sim_board.grid:
+            #     print(i)
 
     def incremental_plan(self, board, new_piece_key):
         sim_board = self.clone_board(board)
-       
-        # Aplicamos los movimientos ya planeados al board clonado
-        for i, move in enumerate(self.planned_moves):
-            if i < len(board.queue):  # Solo acceder a índices válidos
+        print(f'INSIDE INCREMENTAL PLAN: {board.queue}')
+        for i, move in enumerate(self.planned_moves[1:]):
+            if i < len(board.queue): 
                 piece_key = board.queue[i]
+                print(f"MOVE: {move}")
+                print(f"PIECE: {piece_key}")
                 self.apply_move(sim_board, piece_key, move)
 
-        # Planificamos solo el nuevo movimiento para la pieza recién añadida
         best_move = self.choose_best_move(sim_board, new_piece_key)
         self.planned_moves.append(best_move)
 
     def get_next_move(self, board):
-        # Si no hay movimientos planeados, realiza el rollout inicial con los primeros 5 movimientos
-
+        print(f"CURRENT PLANNED QUEUE: {board.queue}")
+        print(f"CURRENT PLANNED MOVES: {self.planned_moves}")
         if not self.planned_moves:
-            initial_list = [board.current_piece_label] + board.queue[:4]
-            self.initial_deep_rollout(board, initial_list)  # Planea con las primeras 5 piezas
+            initial_move = self.choose_best_move(board, board.current_piece_label)
+            self.initial_deep_rollout(board, board.queue, initial_move, board.current_piece_label)  # Planea con las primeras 5 piezas
+            return initial_move
         else:
-            # # Descartamos el primer movimiento ya realizado y planeamos el siguiente movimiento
-            self.planned_moves.pop(0)
+            print("INCREMENTAL DECISION")
+            print(f"planning now for: {board.queue[4]}")
             self.incremental_plan(board, board.queue[4])  # Solo planifica el nuevo movimiento para la nueva pieza
 
-        return self.planned_moves[0]  # Devuelve el siguiente movimiento planeado
+        return self.planned_moves.pop(0)
 
     def compute_aggregate_height(self, board):
         width = 10
