@@ -6,7 +6,6 @@ from ai import AI
 # Inicializar Pygame
 pygame.init()
 
-# Constantes de la ventana
 WIDTH, HEIGHT = 900, 650
 FPS = 10
 BACKGROUND_COLOR = (0, 0, 0)
@@ -16,17 +15,15 @@ GRID_WIDTH, GRID_HEIGHT = 10, 20
 USER_BOARD_X, USER_BOARD_Y = 100, 50
 AI_BOARD_X, AI_BOARD_Y = 550, 50
 
-# Crear la ventana
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Tetris AI vs Player")
 
-# Reloj para controlar FPS
 clock = pygame.time.Clock()
 
 user_board = Board(GRID_WIDTH, GRID_HEIGHT)
 ai_board = Board(GRID_WIDTH, GRID_HEIGHT)
 fall_time = 0
-fall_speed = 300  # milisegundos
+fall_speed = 750 
 ai_player = AI()
 
 def main():
@@ -58,7 +55,8 @@ def main():
         
         if fall_time > fall_speed:
 
-            # user_board.move_down() DESCOMENTAR
+            #descomentar
+            user_board.move_down()
 
             ai_move = ai_player.get_next_move(ai_board)
 

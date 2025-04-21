@@ -10,10 +10,14 @@ class AI:
             # "complete_lines": 0.522287506868767,
             # "holes": -0.24921408023878,
             # "bumpiness": -0.164626498034284
-            "aggregate_height": -0.9,
-            "complete_lines": 0.72,
-            "holes": -0.45,
-            "bumpiness": -0.12
+            # "aggregate_height": -0.9,
+            # "complete_lines": 0.72,
+            # "holes": -0.45,
+            # "bumpiness": -0.12
+            "aggregate_height": -0.6,
+            "complete_lines": 0.85,
+            "holes": -0.6,
+            "bumpiness": -0.25
         }
         self.planned_moves = []
 
@@ -44,7 +48,7 @@ class AI:
             if 0 <= bx < board.width and 0 <= by < board.height:
                 board.grid[by][bx] = piece_color
 
-        board.clear_lines()  # Importante para evaluar correctamente el siguiente estado
+        board.clear_lines()  
 
     def choose_best_move(self, board, piece_key):
         best_score = float('-inf')
@@ -52,14 +56,13 @@ class AI:
         sim_board = None
 
         for rotation in range(ROTATION_LIMITS[piece_key]):
-            # Construir pieza rotada
+
             piece_shape = PIECES[piece_key]
             piece_color = COLORS[piece_key]
             test_piece = Piece(piece_shape.copy(), piece_color)
             for _ in range(rotation):
                 test_piece.rotate()
 
-            # Calcular el ancho máximo (x más alto en la forma)
             piece_width = max(x for x, y in test_piece.shape) + 1
             valid_x_range = board.width - piece_width + 1
 
@@ -68,23 +71,19 @@ class AI:
                 try:
                     # print(f"Trying piece {piece_key} at x={x}, rotation={rotation}")
 
-                    # Crear una copia de la pieza rotada
                     piece = Piece(piece_shape.copy(), piece_color)
                     for _ in range(rotation):
                         piece.rotate()
 
-                    # Calcular posición final bajando la pieza
                     pos = (x, 3)
                     while sim_board.is_valid_position(piece, pos):
                         pos = (pos[0], pos[1] + 1)
                     pos = (pos[0], pos[1] - 1)
 
-                    # Validar posición final
                     if not sim_board.is_valid_position(piece, pos):
                         # print(f"Invalid final position at x={x}, rotation={rotation}, skipping...")
                         continue
 
-                    # Aplicar movimiento y evaluar
                     self.apply_move(sim_board, piece_key, (x, rotation))
                     # print("Board after move:")
                     # for i in sim_board.grid:
@@ -121,12 +120,9 @@ class AI:
 
     def incremental_plan(self, board, new_piece_key):
         sim_board = self.clone_board(board)
-        print(f'INSIDE INCREMENTAL PLAN: {board.queue}')
-        for i, move in enumerate(self.planned_moves[1:]):
+        for i, move in enumerate(self.planned_moves):
             if i < len(board.queue): 
                 piece_key = board.queue[i]
-                print(f"MOVE: {move}")
-                print(f"PIECE: {piece_key}")
                 self.apply_move(sim_board, piece_key, move)
 
         best_move = self.choose_best_move(sim_board, new_piece_key)
@@ -134,17 +130,18 @@ class AI:
 
     def get_next_move(self, board):
         print(f"CURRENT PLANNED QUEUE: {board.queue}")
-        print(f"CURRENT PLANNED MOVES: {self.planned_moves}")
+        print(f"CURRENT PLANNED MOVES: {self.planned_moves[1:]}")
         if not self.planned_moves:
             initial_move = self.choose_best_move(board, board.current_piece_label)
-            self.initial_deep_rollout(board, board.queue, initial_move, board.current_piece_label)  # Planea con las primeras 5 piezas
+            self.initial_deep_rollout(board, board.queue, initial_move, board.current_piece_label)
             return initial_move
         else:
             print("INCREMENTAL DECISION")
             print(f"planning now for: {board.queue[4]}")
-            self.incremental_plan(board, board.queue[4])  # Solo planifica el nuevo movimiento para la nueva pieza
+            move_to_return = self.planned_moves.pop(0)
+            self.incremental_plan(board, board.queue[4])  
 
-        return self.planned_moves.pop(0)
+        return move_to_return
 
     def compute_aggregate_height(self, board):
         width = 10
