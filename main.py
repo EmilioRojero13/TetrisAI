@@ -3,6 +3,7 @@ import sys
 import threading
 from board import Board
 from ai import AI
+import simple
 
 pygame.init()
 
@@ -46,6 +47,9 @@ def compute_ai_move():
 def main():
     global fall_time, ai_next_move, ai_computing, ai_move_ready
     running = True
+    simple_target_x = None
+    simple_target_shape = None
+
     while running:
         dt = clock.tick(FPS)
         fall_time += dt
@@ -72,6 +76,7 @@ def main():
         if fall_time > fall_speed:
             user_board.move_down()
             ai_board.move_down()
+            simple_h_board.move_down()
 
             if not ai_computing and ai_next_move is None:
                 print("Thread started to compute AI move")
@@ -88,6 +93,31 @@ def main():
                 else:
                     print("AI move not ready yet.")
                     
+            
+            # Check if we need a new move for simple_h_board
+            if simple_target_x is None:
+                simple_piece = simple_h_board.current_piece.shape
+                simple_color = simple_h_board.current_piece.color
+                simple_x, simple_y = simple_h_board.current_position
+                simple_grid = simple_h_board.grid
+                simple_queue = simple_h_board.get_queue()
+
+                new_x, new_y, new_shape = simple.ai_move(simple_x, simple_y, simple_piece, simple_color, simple_grid, simple_queue, None)
+
+                simple_target_x = new_x
+                simple_target_shape = new_shape
+                simple_h_board.current_piece.shape = simple_target_shape
+                simple_h_board.current_position = (simple_target_x, simple_h_board.current_position[1])
+
+            # # Step-by-step drop
+            # prev_y = simple_h_board.current_position[1]
+            # simple_h_board.soft_drop()
+
+            # # If locked, reset target
+            # if simple_h_board.current_position[1] == prev_y:  # no move = piece locked
+            #     simple_target_x = None
+            #     simple_target_shape = None
+
             fall_time = 0
 
         user_board.draw(screen, USER_BOARD_X, USER_BOARD_Y, CELL_SIZE)
