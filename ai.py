@@ -1,66 +1,172 @@
-import random
-import pygame
-from collections import deque
-from user import valid_move, rotate_piece, get_next_piece
-from pieces import PIECES, COLORS
+from board import Board
+from piece import PIECES, COLORS, ROTATION_LIMITS, Piece
 
-# AI Falling Speed (in milliseconds)
-AI_FALL_SPEED = 200
-last_ai_fall_time = pygame.time.get_ticks()
+class AI:
+    def __init__(self):
+        self.weights = {
+            "aggregate_height": -0.798752914564018,
+            "complete_lines": 0.522287506868767,
+            "holes": -0.24921408023878,
+            "bumpiness": -0.164626498034284
+        }
+        self.planned_moves = []
 
-# Heuristic Evaluation Function
-def evaluate_board(grid):
-    holes = 0
-    height = 0
-    full_lines = 0
-    for x in range(10):
-        column_height = 0
-        hole_in_column = False
-        for y in range(20):
-            if grid[y][x] is not None:
-                column_height = max(column_height, y)
-                if hole_in_column:
+    def clone_board(self, board):
+        new_board = Board(board.width, board.height)
+        new_board.grid = [row.copy() for row in board.grid] 
+        new_board.queue = board.queue.copy()
+        new_board.current_piece = board.current_piece  
+        new_board.current_position = board.current_position  
+        return new_board
+    
+    def apply_move(self, board, piece_key, move):
+        piece_shape = PIECES[piece_key].copy()  # importante
+        piece_color = COLORS[piece_key]
+        piece = Piece(piece_shape, piece_color)
+
+        x, rotation = move
+        for _ in range(rotation):
+            piece.rotate()
+
+        pos = (x, 3)
+        while board.is_valid_position(piece, pos):
+            pos = (pos[0], pos[1] + 1)
+        pos = (pos[0], pos[1] - 1)
+
+        # Verifica por si acaso que la posición final es válida
+        if not board.is_valid_position(piece, pos):
+            return  # o raise ValueError("Invalid final position")
+
+        for dx, dy in piece.shape:
+            bx, by = pos[0] + dx, pos[1] + dy
+            if 0 <= bx < board.width and 0 <= by < board.height:
+                board.grid[by][bx] = piece_color
+
+        board.clear_lines()
+            
+    def compute_aggregate_height(self, board):
+        width = 10
+        height = 20
+        total_height = 0
+
+        for x in range(width):
+            column_height = 0
+            for y in range(height):
+                if board[y][x] is not None:
+                    column_height = height - y
+                    break
+            total_height += column_height
+
+        return total_height
+    
+    def count_complete_lines(self, board):
+        count = 0
+        for row in board:
+            is_complete = True
+            for cell in row:
+                if cell is None:
+                    is_complete = False
+                    break
+            if is_complete:
+                count += 1
+        return count
+
+    def count_holes(self, board):
+        width = 10
+        height = 20
+        holes = 0
+
+        for x in range(width):
+            block_found = False
+            for y in range(height):
+                if board[y][x] is not None:
+                    block_found = True
+                elif board[y][x] is None and block_found:
                     holes += 1
-            else:
-                hole_in_column = True
-        height += column_height
-    return -height - 5 * holes + 100 * full_lines
 
-# AI Decision Making (choose the best move based on the heuristic)
-def ai_move(ai_x, ai_y, ai_piece, ai_color, ai_grid, ai_piece_queue, user_piece_queue):
-    best_score = float('-inf')
-    best_move = None
+        return holes
+    
+    def compute_bumpiness(self, board):
+        width = 10
+        height = 20
+        heights = []
 
-    for rotation in range(4):  # Try all 4 rotations
-        rotated_piece = ai_piece
-        for _ in range(rotation):
-            rotated_piece = rotate_piece(rotated_piece)
+        for x in range(width):
+            column_height = 0
+            for y in range(height):
+                if board[y][x] is not None:
+                    column_height = height - y
+                    break
+            heights.append(column_height)
 
-        for dx in range(-10, 10):  # Try all x offsets
-            if valid_move(rotated_piece, (ai_x + dx, ai_y), ai_grid):
-                # Drop the piece as far as it can go
-                y_offset = ai_y
-                while valid_move(rotated_piece, (ai_x + dx, y_offset + 1), ai_grid):
-                    y_offset += 1
+        bumpiness = 0
+        for i in range(width - 1):
+            bumpiness += abs(heights[i] - heights[i + 1])
 
-                # Simulate the move
-                temp_grid = [row[:] for row in ai_grid]
-                for dx, dy in rotated_piece:
-                    temp_grid[y_offset + dy][ai_x + dx] = ai_color
+        return bumpiness
+    
+    def eval_function(self, board):
+        agg_height = self.compute_aggregate_height(board)
+        lines = self.count_complete_lines(board)
+        holes = self.count_holes(board)
+        bumpiness = self.compute_bumpiness(board)
 
-                # Evaluate the board state
-                score = evaluate_board(temp_grid)
+        score = (
+            self.weights["aggregate_height"] * agg_height +
+            self.weights["complete_lines"] * lines +
+            self.weights["holes"] * holes +
+            self.weights["bumpiness"] * bumpiness
+        )
+        return score
+    
+    def get_next_move(self, board: Board, queue, depth=0):
+        # Prepend the current falling piece to the queue
+        if depth == 0:
+            current_label = board.current_piece_label
+            queue = [current_label] + queue
 
-                if score > best_score:
-                    best_score = score
-                    best_move = (rotation, dx, y_offset)
+        if not queue or depth >= 3:
+            return self.eval_function(board.grid)
 
-    if best_move:
-        rotation, dx, y_offset = best_move
-        for _ in range(rotation):
-            ai_piece = rotate_piece(ai_piece)
+        piece_key = queue[0]
+        rest_queue = queue[1:]
+        best_score = float('-inf')
+        best_move = None
 
-        ai_x += dx
-        ai_y = y_offset
+        for rotation in range(ROTATION_LIMITS[piece_key]):
+            piece_shape = PIECES[piece_key]
+            piece_color = COLORS[piece_key]
 
-    return ai_x, ai_y, ai_piece
+            piece = Piece(piece_shape.copy(), piece_color)
+
+            # Rotate the piece before checking its width
+            for _ in range(rotation):
+                piece.rotate()
+
+            piece_width = max(dx for dx, dy in piece.shape) + 1
+            valid_range = board.width - piece_width + 1
+
+            for x in range(valid_range):
+                sim_board = self.clone_board(board)
+
+                # Apply hard drop simulation
+                pos = (x, 3)
+                while sim_board.is_valid_position(piece, pos):
+                    pos = (pos[0], pos[1] + 1)
+                pos = (pos[0], pos[1] - 1)
+
+                if not sim_board.is_valid_position(piece, pos):
+                    continue
+
+                self.apply_move(sim_board, piece_key, (x, rotation))
+
+                score = self.get_next_move(sim_board, rest_queue, depth + 1)
+
+                if depth == 0:
+                    if score > best_score:
+                        best_score = score
+                        best_move = (x, rotation)
+                else:
+                    best_score = max(best_score, score)
+
+        return best_move if depth == 0 else best_score
