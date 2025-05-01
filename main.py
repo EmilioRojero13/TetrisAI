@@ -6,7 +6,7 @@ from ai import AI
 
 pygame.init()
 
-WIDTH, HEIGHT = 900, 650
+WIDTH, HEIGHT = 1500, 650
 FPS = 10
 BACKGROUND_COLOR = (0, 0, 0)
 CELL_SIZE = 30
@@ -14,6 +14,7 @@ GRID_WIDTH, GRID_HEIGHT = 10, 20
 
 USER_BOARD_X, USER_BOARD_Y = 100, 50
 AI_BOARD_X, AI_BOARD_Y = 550, 50
+SIMPLE_H_X , SIMPLE_H_Y = 1000, 50
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Tetris AI vs Player")
@@ -22,6 +23,8 @@ clock = pygame.time.Clock()
 
 user_board = Board(GRID_WIDTH, GRID_HEIGHT)
 ai_board = Board(GRID_WIDTH, GRID_HEIGHT)
+simple_h_board = Board(GRID_WIDTH, GRID_HEIGHT)
+
 fall_time = 0
 fall_speed = 170
 ai_player = AI()
@@ -89,6 +92,8 @@ def main():
 
         user_board.draw(screen, USER_BOARD_X, USER_BOARD_Y, CELL_SIZE)
         ai_board.draw(screen, AI_BOARD_X, AI_BOARD_Y, CELL_SIZE)
+        simple_h_board.draw(screen, SIMPLE_H_X,SIMPLE_H_Y,CELL_SIZE)
+
         pygame.display.flip()
 
     pygame.quit()
