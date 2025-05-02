@@ -15,6 +15,8 @@ class Board:
         self.current_piece = None
         self.current_position = None
         self.current_piece_label = None
+        self.lines_cleared = 0
+        self.game_over = False
         self.queue = self.init_queue()
         self.spawn_new_piece()
 
@@ -31,10 +33,11 @@ class Board:
         for dx, dy in piece.shape:
             x = pos[0] + dx
             y = pos[1] + dy
-            if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            if x < 0 or x >= self.width or y >= self.height:
                 return False
-            if self.grid[y][x] is not None:
+            if y >= 0 and self.grid[y][x] is not None:
                 return False
+
         return True
 
     def spawn_new_piece(self):
@@ -49,14 +52,18 @@ class Board:
 
         if not self.is_valid_position(self.current_piece, self.current_position):
             print("Game Over! Piece collided at spawn position.")
-            pygame.quit()
-            sys.exit(1)
+            self.game_over = True
+
+
+    def is_game_over(self):
+        return self.game_over
 
     def clear_lines(self):
         new_grid = [row for row in self.grid if any(cell is None for cell in row)]
         lines_cleared = self.height - len(new_grid)
         new_rows = [[None] * self.width for _ in range(lines_cleared)]
         self.grid = new_rows + new_grid
+        self.lines_cleared += lines_cleared
 
     def lock_piece(self):
         for dx, dy in self.current_piece.shape:
@@ -67,6 +74,9 @@ class Board:
                 self.grid[y][x] = self.current_piece.color
 
     def move_down(self):
+        if self.game_over:
+            return
+
         new_pos = (self.current_position[0], self.current_position[1] + 1)
         if self.is_valid_position(self.current_piece, new_pos):
             self.current_position = new_pos
@@ -116,6 +126,9 @@ class Board:
             self.current_position = new_pos
 
     def soft_drop(self):
+        if self.game_over:
+            return
+
         new_pos = (self.current_position[0], self.current_position[1] + 1)
         if self.is_valid_position(self.current_piece, new_pos):
             self.current_position = new_pos
@@ -135,6 +148,9 @@ class Board:
             self.current_piece = rotated_piece
 
     def hard_drop_to_column(self,x=None, rotation=0):
+        if self.game_over:
+            return
+
         if rotation:
             self.rotate(rotation)
 
